@@ -1,0 +1,70 @@
+# Dockerfile for build-server with database logging support
+FROM oven/bun:1.2.15-alpine AS base
+
+# Install git (required for cloning repositories)
+RUN apk update && apk add --no-cache git
+
+# Set working directory
+WORKDIR /app
+
+# ============================================
+# Stage 1: Builder - Install dependencies
+# ============================================
+FROM base AS builder
+
+# Copy monorepo package files for dependency resolution
+COPY package.json bun.lock turbo.json ./
+
+# Copy workspace packages and build-server
+COPY packages/ packages/
+COPY apps/build-server/ apps/build-server/
+
+# Install all dependencies (including workspace packages)
+RUN bun install
+
+# ============================================
+# Stage 2: Runtime - Minimal production image
+# ============================================
+FROM base AS runtime
+
+# Copy installed dependencies from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+
+# Copy root package configuration
+COPY package.json bun.lock turbo.json ./
+
+# Copy build-server application
+COPY --from=builder /app/apps/build-server ./apps/build-server
+
+# Set working directory to root (where node_modules exists)
+WORKDIR /app
+
+# Make main.sh in build-server executable
+RUN chmod +x ./apps/build-server/main.sh
+
+# Create output directory (will be populated by git clone)
+RUN mkdir -p ./apps/build-server/output
+
+# Copy workspace packages and dependencies to build-server node_modules  
+RUN mkdir -p ./apps/build-server/node_modules/@repo && \
+    cp -r ./packages/prisma-store ./apps/build-server/node_modules/@repo/ && \
+    cp -r ./packages/awss3 ./apps/build-server/node_modules/@repo/ && \
+    cp -r ./node_modules/mime ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/@aws-sdk ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/@smithy ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/@aws-crypto ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/uuid ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/tslib ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/fast-xml-parser ./apps/build-server/node_modules/ && \
+    cp -r ./node_modules/strnum ./apps/build-server/node_modules/
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD bun --version || exit 1
+
+# Use main.sh as entrypoint (handles git clone + runs index.ts)
+ENTRYPOINT ["./apps/build-server/main.sh"]
