@@ -58,33 +58,44 @@ export const HeroSection = () => {
               transition={{ duration: 0.8, delay: 0.2 }}
             >
               {/* Main Heading */}
-              <motion.h1 
-                className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight relative"
-                initial={{ opacity: 0, y: 50 }}
+                            {/* Main Heading - Smaller and Side Positioned */}
+              <motion.div
+                className="flex items-center gap-4 mb-8"
+                initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 1, delay: 0.6 }}
+                transition={{ duration: 0.8, delay: 0.4 }}
               >
-                <motion.span
-                  className="block mb-4"
-                  initial={{ opacity: 0, x: -50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.8, delay: 0.8 }}
+                <motion.h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight">
+                  <span className="text-foreground">
+                    Deploy with{" "}
+                  </span>
+                  <motion.span
+                    className="bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500 bg-clip-text text-transparent"
+                    animate={{ backgroundPosition: "200% 0%" }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    style={{
+                      backgroundSize: "200% 200%"
+                    }}
+                  >
+                    Confidence
+                  </motion.span>
+                </motion.h1>
+                
+                {/* Beautiful accent element */}
+                <motion.div
+                  className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.6, delay: 0.8 }}
                 >
-                  Deploy with
-                </motion.span>
-                <motion.span 
-                  className="block gradient-text relative"
-                  animate={{ 
-                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"]
-                  }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                  style={{
-                    backgroundSize: "200% 200%"
-                  }}
-                >
-                  Confidence
-                </motion.span>
-              </motion.h1>
+                  <motion.div
+                    className="w-2 h-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full"
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                  <span className="text-sm font-medium text-purple-300">Live Platform</span>
+                </motion.div>
+              </motion.div>
 
               {/* Subtitle */}
               <motion.p 

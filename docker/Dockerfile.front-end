@@ -1,0 +1,56 @@
+FROM oven/bun:1.2.15-alpine AS deps
+
+# Stage 1: Install dependencies and build
+WORKDIR /home/app
+
+RUN apk add --no-cache git libc6-compat
+
+# Copy workspace manifests
+COPY package.json bun.lock turbo.json ./
+COPY apps/front-end/package.json ./apps/front-end/
+COPY packages/prisma-store/package.json ./packages/prisma-store/
+
+# Copy workspace dependencies and app source
+COPY packages/prisma-store ./packages/prisma-store
+COPY apps/front-end ./apps/front-end
+
+# Install dependencies
+RUN bun install
+
+# Generate Prisma client
+RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
+
+# Build the Next.js application
+WORKDIR /home/app/apps/front-end
+RUN bun run build
+
+# Stage 2: Runtime
+FROM oven/bun:1.2.15-alpine AS runner
+WORKDIR /home/app
+
+RUN addgroup --system --gid 1001 deployflow && \
+    adduser --system --uid 1001 --ingroup deployflow appUser
+
+# Copy dependencies and built application
+COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
+COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
+COPY --from=deps --chown=appUser:deployflow /home/app/packages/prisma-store ./packages/prisma-store
+
+# Copy built Next.js application
+COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/.next ./apps/front-end/.next
+COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/public ./apps/front-end/public
+COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/package.json ./apps/front-end/package.json
+COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/next.config.ts ./apps/front-end/next.config.ts
+
+USER appUser
+
+# Environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Expose port
+EXPOSE 3000
+
+ENTRYPOINT ["bun", "--cwd", "apps/front-end", "run", "start"]

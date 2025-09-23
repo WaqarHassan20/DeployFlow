@@ -1,8 +1,29 @@
 import { s3Client, PutObjectCommand } from "@repo/awss3";
 import { exec } from "child_process";
-import mime from "mime";
 import path from "path";
 import fs from "fs";
+
+// Simple mime type function
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeMap: Record<string, string> = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.txt': 'text/plain',
+    '.pdf': 'application/pdf',
+    '.zip': 'application/zip',
+    '.xml': 'application/xml'
+  };
+  return mimeMap[ext] || 'application/octet-stream';
+}
 
 // Initialize S3 client
 const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
@@ -49,13 +70,14 @@ const init = async () => {
     PublishLog("Build Started...");
 
     const outDirPath = path.join(__dirname, "output");
-    new Promise((resolve) => setTimeout(resolve, 2000));
 
     if (!fs.existsSync(outDirPath)) {
       throw new Error(
         `Output directory not found: ${outDirPath}. Git clone may have failed.`
       );
     }
+
+    PublishLog("Repository found, starting build process...");
 
     const p = exec(`cd ${outDirPath} && bun install && bun run build`);
 
@@ -70,8 +92,7 @@ const init = async () => {
     });
 
     p.on("close", async (code) => {
-      PublishLog(
-        `Build completed with exit code: ${code}`,
+      PublishLog(`Build completed with exit code: ${code}`,
         code === 0 ? "INFO" : "ERROR"
       );
 
@@ -111,10 +132,10 @@ const init = async () => {
               Key: `__outputs/${PROJECT_ID}/${file}`,
               Body: fileBody,
               ContentType:
-                mime.getType(absoluteFilePath) || "application/octet-stream",
+                getMimeType(absoluteFilePath),
             });
 
-            s3Client.send(command);
+            await s3Client.send(command);
             PublishLog(`Successfully uploaded: ${file}`, "INFO");
           } catch (uploadError) {
             PublishLog(

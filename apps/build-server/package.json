@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@repo/awss3": "workspace:*",
+    "@repo/prisma-store": "workspace:*",
     "mime": "^4.0.7"
   }
 }

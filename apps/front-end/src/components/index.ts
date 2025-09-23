@@ -3,6 +3,8 @@ export { Button } from './ui/Button'
 export { AnimatedBackground } from './ui/AnimatedBackground'
 export { FeatureCard } from './ui/FeatureCard'
 export { PricingCard } from './ui/PricingCard'
+export { FullPageLoading } from './ui/FullPageLoading'
+export { ScrollProgressBar } from './ui/ScrollProgressBar'
 
 // Section Components
 export { Navigation } from './sections/Navigation'

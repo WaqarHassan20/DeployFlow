@@ -142,14 +142,14 @@ export const PricingSection = () => {
 
                 <motion.button
                   onClick={() => handlePlanSelect(plan.name, plan.buttonText)}
-                  disabled={loadingPlan === plan.name}
-                  className={`w-full py-3 px-6 rounded-xl font-semibold backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-2 ${
+                  disabled={true} // Disabled as requested
+                  className={`w-full py-3 px-6 rounded-xl font-semibold backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-2 opacity-50 cursor-not-allowed ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-400 hover:to-blue-400 shadow-lg hover:shadow-purple-500/25'
-                      : 'bg-white/10 text-white border border-white/20 hover:bg-white/15 hover:border-white/30'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  whileHover={loadingPlan !== plan.name ? { scale: 1.02 } : {}}
-                  whileTap={loadingPlan !== plan.name ? { scale: 0.98 } : {}}
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white border border-purple-500/30'
+                      : 'bg-white/10 text-white border border-white/20'
+                  }`}
+                  whileHover={{ scale: 1 }} // Remove hover animation when disabled
+                  whileTap={{ scale: 1 }} // Remove tap animation when disabled
                 >
                   {loadingPlan === plan.name ? (
                     <>
@@ -157,7 +157,10 @@ export const PricingSection = () => {
                       Processing...
                     </>
                   ) : (
-                    plan.buttonText
+                    <>
+                      <span>{plan.buttonText}</span>
+                      <span className="text-xs opacity-70">(Coming Soon)</span>
+                    </>
                   )}
                 </motion.button>
               </div>

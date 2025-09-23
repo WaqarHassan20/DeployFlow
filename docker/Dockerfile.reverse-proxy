@@ -1,0 +1,36 @@
+FROM oven/bun:1.2.15-alpine AS deps
+
+# Stage 1: Install dependencies
+WORKDIR /home/app
+
+RUN apk add --no-cache git
+
+# Copy package files for dependency resolution
+COPY package.json bun.lock turbo.json ./
+COPY apps/reverse-proxy/package.json ./apps/reverse-proxy/
+
+# Install dependencies
+RUN bun install
+
+# Stage 2: Runtime
+FROM oven/bun:1.2.15-alpine AS runner
+WORKDIR /home/app
+
+RUN addgroup --system --gid 1001 deployflow && \
+    adduser --system --uid 1001 --ingroup deployflow appUser
+
+# Copy dependencies and source code
+COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
+COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
+COPY --chown=appUser:deployflow apps/reverse-proxy ./apps/reverse-proxy
+
+USER appUser
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
+
+# Expose port
+EXPOSE 8080
+
+ENTRYPOINT ["bun", "apps/reverse-proxy/index.ts"]

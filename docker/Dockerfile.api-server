@@ -1,0 +1,41 @@
+FROM oven/bun:1.2.15-alpine AS deps
+WORKDIR /home/app
+
+RUN apk add --no-cache git
+
+# Copy workspace manifests
+COPY package.json bun.lock turbo.json ./
+COPY apps/api-server/package.json ./apps/api-server/
+COPY packages/prisma-store/package.json ./packages/prisma-store/
+
+# Copy Prisma schema and code
+COPY packages/prisma-store ./packages/prisma-store
+COPY apps/api-server ./apps/api-server
+
+# Install all deps with bun (workspace aware)
+RUN bun install
+
+# Generate Prisma client
+RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
+
+# Stage 2: Build & run
+FROM oven/bun:1.2.15-alpine AS runner
+WORKDIR /home/app
+
+RUN addgroup --system --gid 1001 deployflow && \
+    adduser --system --uid 1001 --ingroup deployflow appUser
+
+# Copy deps and generated Prisma client
+COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
+COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
+COPY --from=deps --chown=appUser:deployflow /home/app/packages ./packages
+COPY --from=deps --chown=appUser:deployflow /home/app/apps ./apps
+
+USER appUser
+
+ENV NODE_ENV=production
+ENV API_PORT=9000
+
+EXPOSE 9000
+
+ENTRYPOINT ["bun", "apps/api-server/index.ts"]

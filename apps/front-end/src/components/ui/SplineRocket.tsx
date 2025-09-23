@@ -122,13 +122,20 @@ export const SplineRocket: React.FC<SplineRocketProps> = ({
           </motion.svg>
 
           {/* Floating Particles */}
-          {[...Array(6)].map((_, i) => (
+          {[
+            { left: 130, top: 150 }, // 0°
+            { left: 119, top: 81 },  // 60°
+            { left: 89, top: 81 },   // 120°
+            { left: 50, top: 150 },  // 180°
+            { left: 89, top: 219 },  // 240°
+            { left: 119, top: 219 }  // 300°
+          ].map((position, i) => (
             <motion.div
               key={i}
               className="absolute w-2 h-2 bg-gray-400 rounded-full"
               style={{
-                left: `${50 + Math.cos(i * 60 * Math.PI / 180) * 80}px`,
-                top: `${150 + Math.sin(i * 60 * Math.PI / 180) * 80}px`
+                left: `${position.left}px`,
+                top: `${position.top}px`
               }}
               animate={{
                 scale: [0.5, 1.5, 0.5],

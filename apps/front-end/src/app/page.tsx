@@ -10,6 +10,7 @@ import {
   PricingSection,
   Footer
 } from "../components/landingPage";
+import { ScrollProgressBar } from "../components/ui/ScrollProgressBar";
 import { useRouter } from "next/navigation";
 import { FullScreenLoading } from "../components/ui";
 import { LoadingProvider, useLoading } from "../components/providers";
@@ -64,20 +65,31 @@ function LandingPageContent() {
           onSignupClick={handleSignupClick}
         />
 
+        {/* Scroll Progress Bar */}
+        <ScrollProgressBar />
+
         {/* Hero Section */}
-        <HeroSection />
+        <div id="hero">
+          <HeroSection />
+        </div>
 
         {/* Features Section */}
-        <FeaturesSection />
+        <div id="features">
+          <FeaturesSection />
+        </div>
 
         {/* Testimonials Section */}
         <TestimonialsSection />
 
         {/* Pricing Section */}
-        <PricingSection />
+        <div id="pricing">
+          <PricingSection />
+        </div>
 
         {/* Footer */}
-        <Footer />
+        <div id="cta">
+          <Footer />
+        </div>
       </div>
     </>
   );

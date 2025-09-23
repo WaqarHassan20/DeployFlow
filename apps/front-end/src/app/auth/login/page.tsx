@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Check } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingButton, GoogleButton, GithubButton } from "../../../components/ui";
+import { FullPageLoading } from "../../../components/ui/FullPageLoading";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const { data: session, status } = useSession();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [isFullPageLoading, setIsFullPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +29,7 @@ export default function LoginPage() {
   }, [session, status, router]);
 
   useEffect(() => {
-    const messageParam = searchParams.get("message");
+    const messageParam = searchParams?.get("message");
     if (messageParam) {
       setMessage(decodeURIComponent(messageParam));
       // Clear message from URL after 5 seconds
@@ -44,11 +46,12 @@ export default function LoginPage() {
     if (message) setMessage(null);
   };
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setIsFullPageLoading(true);
     setError(null);
 
     // Set remember me cookie before sign in
@@ -67,7 +70,9 @@ export default function LoginPage() {
 
     if (result?.error) {
       setError(result.error);
+      setIsFullPageLoading(false);
     } else if (result?.ok) {
+      // Keep loading while redirecting
       router.push(result.url || callbackUrl);
     }
 
@@ -76,6 +81,7 @@ export default function LoginPage() {
 
   const handleOAuthSignIn = async (provider: 'google' | 'github') => {
     setIsLoading(true);
+    setIsFullPageLoading(true);
     setError(null);
     
     await signIn(provider, {
@@ -85,6 +91,15 @@ export default function LoginPage() {
 
   return (
     <>
+      <AnimatePresence>
+        {isFullPageLoading && (
+          <FullPageLoading 
+            message="Signing you in..." 
+            submessage="Verifying your credentials and setting up your session"
+          />
+        )}
+      </AnimatePresence>
+      
       {/* Login Card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}

@@ -51,31 +51,6 @@ app.use("/project", projectRoute);
 app.use("/deploy", deployRoute);
 app.use("/logs", logsRoute);
 
-// app.delete("/clear-bucket", async (req, res) => {
-//   try {
-//     // List all objects
-//     const listResponse = await s3.send(new ListObjectsV2Command({ Bucket: bucketName }));
-//     const objects = listResponse.Contents;
-
-//     if (!objects || objects.length === 0) {
-//       return res.status(200).json({ message: "Bucket is already empty" });
-//     }
-
-//     // Delete all objects
-//     const deleteParams = {
-//       Bucket: bucketName,
-//       Delete: { Objects: objects.map(obj => ({ Key: obj.Key! })) },
-//     };
-
-//     await s3.send(new DeleteObjectsCommand(deleteParams));
-
-//     return res.status(200).json({ message: "Bucket cleared successfully", deleted: objects.length });
-//   } catch (err) {
-//     console.error("Error clearing bucket:", err);
-//     return res.status(500).json({ error: "Failed to clear bucket", details: err });
-//   }
-// });
-
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled error:', err);

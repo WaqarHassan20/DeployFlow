@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Mail, User, Lock, ArrowRight, Eye, EyeOff, Check } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoadingButton, GoogleButton, GithubButton } from "../../../components/ui";
+import { FullPageLoading } from "../../../components/ui/FullPageLoading";
 
 export default function SignupPage() {
   const { data: session, status } = useSession();
@@ -17,6 +18,7 @@ export default function SignupPage() {
     agreeToTerms: false 
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isFullPageLoading, setIsFullPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +50,7 @@ export default function SignupPage() {
     }
 
     setIsLoading(true);
+    setIsFullPageLoading(true);
     setError(null);
     setSuccess(null);
 
@@ -67,6 +70,7 @@ export default function SignupPage() {
       if (!response.ok) {
         setError(data.message || 'Registration failed');
         setIsLoading(false);
+        setIsFullPageLoading(false);
         return;
       }
 
@@ -87,6 +91,8 @@ export default function SignupPage() {
         setTimeout(() => {
           router.push('/auth/login?message=Account created successfully! You can now sign in.');
         }, 2000);
+      } else {
+        setIsFullPageLoading(false);
       }
 
       setIsLoading(false);
@@ -94,11 +100,13 @@ export default function SignupPage() {
     } catch (error) {
       setError('Network error. Please try again.');
       setIsLoading(false);
+      setIsFullPageLoading(false);
     }
   };
 
   const handleOAuthSignIn = async (provider: 'google' | 'github') => {
     setIsLoading(true);
+    setIsFullPageLoading(true);
     setError(null);
     
     await signIn(provider, {
@@ -108,6 +116,15 @@ export default function SignupPage() {
 
   return (
     <>
+      <AnimatePresence>
+        {isFullPageLoading && (
+          <FullPageLoading 
+            message="Creating your account..." 
+            submessage="Setting up your profile and preparing your workspace"
+          />
+        )}
+      </AnimatePresence>
+      
       {/* Signup Card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
