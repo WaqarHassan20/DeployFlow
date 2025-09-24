@@ -25,8 +25,17 @@ RUN bun install
 # Generate Prisma client
 RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 
-# Build Next.js frontend using turbo from root (respects monorepo dependencies)
-RUN bunx turbo build --filter=front-end
+# Set build environment variables (required for Next.js build)
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
+# Build Next.js frontend with explicit working directory
+WORKDIR /home/app/apps/front-end
+RUN bun run build
+
+# Return to main workdir
+WORKDIR /home/app
 
 
 # Stage 2: Runtime
