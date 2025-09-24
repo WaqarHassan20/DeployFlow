@@ -10,9 +10,13 @@ RUN apk add --no-cache git libc6-compat
 COPY package.json bun.lock turbo.json ./
 COPY apps/front-end/package.json ./apps/front-end/
 COPY packages/prisma-store/package.json ./packages/prisma-store/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
 
 # Copy all source
 COPY packages/prisma-store ./packages/prisma-store
+COPY packages/typescript-config ./packages/typescript-config
+COPY packages/eslint-config ./packages/eslint-config
 COPY apps/front-end ./apps/front-end
 
 # Install dependencies at root (monorepo-aware)
@@ -21,8 +25,8 @@ RUN bun install
 # Generate Prisma client
 RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 
-# Build Next.js frontend from root using workspace context
-RUN bun run --cwd apps/front-end build
+# Build Next.js frontend using turbo from root (respects monorepo dependencies)
+RUN bunx turbo build --filter=front-end
 
 
 # Stage 2: Runtime
@@ -38,6 +42,8 @@ RUN addgroup --system --gid 1001 deployflow && \
 COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
 COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
 COPY --from=deps --chown=appUser:deployflow /home/app/packages/prisma-store ./packages/prisma-store
+COPY --from=deps --chown=appUser:deployflow /home/app/packages/typescript-config ./packages/typescript-config
+COPY --from=deps --chown=appUser:deployflow /home/app/packages/eslint-config ./packages/eslint-config
 
 # Copy built frontend
 COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/.next ./apps/front-end/.next
