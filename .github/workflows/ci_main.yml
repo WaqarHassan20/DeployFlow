@@ -75,7 +75,7 @@ jobs:
               - 'docker/Dockerfile.build-server'
 
       - name: Build and push Docker image
-        if: steps.filter.outputs[matrix.service.name] == 'true'
+        if: ${{ steps.filter.outputs[matrix.service.name] == 'true' }}
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -84,11 +84,3 @@ jobs:
           tags: |
             waqarhasan/deployflow-${{ matrix.service.name }}:latest
             waqarhasan/deployflow-${{ matrix.service.name }}:${{ github.sha }}
-
-
-
-
-
-
-
-            
