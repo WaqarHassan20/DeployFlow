@@ -29,6 +29,7 @@ jobs:
             dockerfile: docker/Dockerfile.reverse-proxy
             paths:
               - "apps/reverse-proxy/**"
+              - "packages/**"
 
           - name: build-server
             dockerfile: docker/Dockerfile.build-server
@@ -65,22 +66,21 @@ jobs:
               - 'docker/Dockerfile.front-end'
             reverse-proxy:
               - 'apps/reverse-proxy/**'
-              - 'packages/typescript-config/**'
-              - 'packages/eslint-config/**'
+              - 'packages/**'
               - 'docker/Dockerfile.reverse-proxy'
             build-server:
               - 'apps/build-server/**'
               - 'docker/Dockerfile.build-server'
 
       - name: Build and push Docker image
-        if: ${{ steps.filter.outputs[matrix.service.name] == 'true' }}
+        if: steps.filter.outputs[matrix.service.name] == 'true'
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ${{ matrix.service.dockerfile }}
           push: true
-          build-args: |
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
           tags: |
             waqarhasan/deployflow-${{ matrix.service.name }}:latest
             waqarhasan/deployflow-${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
