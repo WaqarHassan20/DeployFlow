@@ -1,5 +1,7 @@
+FROM oven/bun:alpine AS baseimage
+
 # Stage 1: Install ALL dependencies (needed for build)
-FROM oven/bun:1.2.15-alpine AS deps
+FROM baseimage AS deps
 WORKDIR /home/app
 COPY package.json bun.lock turbo.json ./
 COPY apps/front-end/package.json ./apps/front-end/
@@ -10,7 +12,7 @@ COPY packages/eslint-config/package.json ./packages/eslint-config/
 RUN bun install
 
 # Stage 2: Build stage
-FROM oven/bun:1.2.15-alpine AS builder
+FROM baseimage AS builder
 WORKDIR /home/app
 RUN apk add --no-cache git libc6-compat
 
@@ -23,7 +25,6 @@ COPY --from=deps /home/app/bun.lock ./bun.lock
 COPY packages ./packages
 COPY apps/front-end ./apps/front-end
 
-# Generate Prisma client
 RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 
 # Build arguments for compilation (not secrets)
@@ -47,36 +48,24 @@ RUN DATABASE_URL="$BUILD_DATABASE_URL" \
     GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_SECRET" \
     RESEND_API_KEY="$BUILD_RESEND_API_KEY" \
     EMAIL_FROM="$BUILD_EMAIL_FROM" \
-    NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
     bun --cwd apps/front-end run build
 
-
 # Stage 3: Production Runtime (OPTIMIZED)
-FROM oven/bun:1.2.15-alpine AS runner
+FROM oven/bun:alpine AS runner
 WORKDIR /home/app
 
 RUN apk add --no-cache git libc6-compat && \
     addgroup --system --gid 1001 deployflow && \
     adduser --system --uid 1001 --ingroup deployflow appUser
 
-# Copy only Next.js build output and essential files (using standalone build)
+# Copy only Next.js build output and essential files
 COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/.next/standalone ./
 COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/.next/static ./apps/front-end/.next/static
 
 # Create public directory (standalone build expects it even if empty)
 RUN mkdir -p ./apps/front-end/public
-COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/public ./apps/front-end/public
 
 USER appUser
-
-# Environment
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
 EXPOSE 3000
 
-# Run Next.js standalone server
 CMD ["node", "apps/front-end/server.js"]
