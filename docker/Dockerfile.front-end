@@ -38,23 +38,34 @@ ARG BUILD_GITHUB_CLIENT_SECRET="dummy-github-client-value"
 ARG BUILD_RESEND_API_KEY="dummy-resend-value"
 ARG BUILD_EMAIL_FROM="noreply@example.com"
 
-# Build Next.js with build arguments
-RUN DATABASE_URL="$BUILD_DATABASE_URL" \
-    NEXTAUTH_URL="$BUILD_NEXTAUTH_URL" \
-    NEXTAUTH_SECRET="$BUILD_NEXTAUTH_SECRET" \
-    GOOGLE_CLIENT_ID="$BUILD_GOOGLE_CLIENT_ID" \
-    GOOGLE_CLIENT_SECRET="$BUILD_GOOGLE_CLIENT_SECRET" \
-    GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID" \
-    GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_SECRET" \
-    RESEND_API_KEY="$BUILD_RESEND_API_KEY" \
-    EMAIL_FROM="$BUILD_EMAIL_FROM" \
-    NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    cd apps/front-end && bun run build
+# Set environment variables for build
+ENV DATABASE_URL="$BUILD_DATABASE_URL"
+ENV NEXTAUTH_URL="$BUILD_NEXTAUTH_URL"
+ENV NEXTAUTH_SECRET="$BUILD_NEXTAUTH_SECRET"
+ENV GOOGLE_CLIENT_ID="$BUILD_GOOGLE_CLIENT_ID"
+ENV GOOGLE_CLIENT_SECRET="$BUILD_GOOGLE_CLIENT_SECRET"
+ENV GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID"
+ENV GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_SECRET"
+ENV RESEND_API_KEY="$BUILD_RESEND_API_KEY"
+ENV EMAIL_FROM="$BUILD_EMAIL_FROM"
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Debug: Check environment and files before build
+RUN echo "Current directory:" && pwd
+RUN echo "Files in apps/front-end:" && ls -la apps/front-end/
+RUN echo "Package.json contents:" && cat apps/front-end/package.json
+
+# Build Next.js (change to directory first, then build)
+WORKDIR /home/app/apps/front-end
+RUN bun run build
 
 # Debug: Check what was built
-RUN ls -la apps/front-end/.next/ || echo "No .next directory found"
-RUN ls -la apps/front-end/.next/standalone/ || echo "No standalone directory found"
+RUN ls -la .next/ || echo "No .next directory found"
+RUN ls -la .next/standalone/ || echo "No standalone directory found"
+
+# Return to main workdir
+WORKDIR /home/app
 
 # Stage 3: Production Runtime (OPTIMIZED)
 FROM oven/bun:alpine AS runner
