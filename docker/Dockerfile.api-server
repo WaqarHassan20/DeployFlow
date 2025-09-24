@@ -1,50 +1,41 @@
-FROM oven/bun:alpine AS baseimage
-
-# Stage 1: Install ALL dependencies (needed for build)
-FROM baseimage AS deps
+FROM oven/bun:1.2.15-alpine AS deps
 WORKDIR /home/app
+
+RUN apk add --no-cache git
+
+# Copy workspace manifests
 COPY package.json bun.lock turbo.json ./
 COPY apps/api-server/package.json ./apps/api-server/
 COPY packages/prisma-store/package.json ./packages/prisma-store/
 
-RUN bun install
-
-# Stage 2: Build stage
-FROM baseimage AS builder
-WORKDIR /home/app
-RUN apk add --no-cache git libc6-compat
-
-COPY --from=deps /home/app/node_modules ./node_modules
-COPY --from=deps /home/app/package.json ./package.json
-COPY --from=deps /home/app/turbo.json ./turbo.json
-COPY --from=deps /home/app/bun.lock ./bun.lock
-
-# Copy source code
-COPY packages ./packages
+# Copy Prisma schema and code
+COPY packages/prisma-store ./packages/prisma-store
 COPY apps/api-server ./apps/api-server
 
+# Install all deps with bun (workspace aware)
+RUN bun install
+
+# Generate Prisma client
 RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 
-# Build arguments for compilation (not secrets)
-ARG BUILD_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-
-# Prepare for production (TypeScript compilation if needed)
-RUN cd apps/api-server && bun run build || echo "No build script found, using source directly"
-
-# Stage 3: Production Runtime (OPTIMIZED)
-FROM oven/bun:alpine AS runner
+# Stage 2: Build & run
+FROM oven/bun:1.2.15-alpine AS runner
 WORKDIR /home/app
 
-RUN apk add --no-cache git libc6-compat && \
-    addgroup --system --gid 1001 deployflow && \
+RUN addgroup --system --gid 1001 deployflow && \
     adduser --system --uid 1001 --ingroup deployflow appUser
 
-# Copy only necessary runtime files
-COPY --from=builder --chown=appUser:deployflow /home/app/node_modules ./node_modules
-COPY --from=builder --chown=appUser:deployflow /home/app/packages ./packages
-COPY --from=builder --chown=appUser:deployflow /home/app/apps/api-server ./apps/api-server
+# Copy deps and generated Prisma client
+COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
+COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
+COPY --from=deps --chown=appUser:deployflow /home/app/packages ./packages
+COPY --from=deps --chown=appUser:deployflow /home/app/apps ./apps
 
 USER appUser
+
+ENV NODE_ENV=production
+ENV API_PORT=9000
+
 EXPOSE 9000
 
-CMD ["bun", "run", "apps/api-server/index.ts"]
+ENTRYPOINT ["bun", "apps/api-server/index.ts"]

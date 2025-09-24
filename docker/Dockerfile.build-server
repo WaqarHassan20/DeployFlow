@@ -1,57 +1,51 @@
-FROM oven/bun:alpine AS baseimage
+FROM oven/bun:1.2.15-alpine AS deps
 
-# Stage 1: Install ALL dependencies (needed for build)
-FROM baseimage AS deps
+# Stage 1: Install dependencies
 WORKDIR /home/app
+
+RUN apk add --no-cache git
+
+# Copy workspace manifests
 COPY package.json bun.lock turbo.json ./
 COPY apps/build-server/package.json ./apps/build-server/
 COPY packages/prisma-store/package.json ./packages/prisma-store/
 COPY packages/awss3/package.json ./packages/awss3/
 
-RUN bun install
-
-# Stage 2: Build stage
-FROM baseimage AS builder
-WORKDIR /home/app
-RUN apk add --no-cache git libc6-compat
-
-COPY --from=deps /home/app/node_modules ./node_modules
-COPY --from=deps /home/app/package.json ./package.json
-COPY --from=deps /home/app/turbo.json ./turbo.json
-COPY --from=deps /home/app/bun.lock ./bun.lock
-
-# Copy source code
-COPY packages ./packages
+# Copy workspace dependencies source code
+COPY packages/awss3 ./packages/awss3
+COPY packages/prisma-store ./packages/prisma-store
 COPY apps/build-server ./apps/build-server
 
-RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
+# Install dependencies
+RUN bun install
 
-# Build arguments for compilation (not secrets)
-ARG BUILD_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-ARG BUILD_S3_ACCESS_KEY_ID="dummy-access-key"
-ARG BUILD_S3_SECRET_ACCESS_KEY="dummy-secret-key"
-ARG BUILD_S3_ENDPOINT="https://dummy-endpoint.com"
-ARG BUILD_BUCKET="dummy-bucket"
+# Generate Prisma client
+RUN cd packages/prisma-store && bunx prisma generate
 
-# Prepare for production
-RUN cd apps/build-server && bun run build || echo "No build script found, using source directly"
-
-# Stage 3: Production Runtime (OPTIMIZED)
-FROM oven/bun:alpine AS runner
+# Stage 2: Runtime
+FROM oven/bun:1.2.15-alpine AS runner
 WORKDIR /home/app
 
-RUN apk add --no-cache git libc6-compat && \
-    addgroup --system --gid 1001 deployflow && \
+RUN apk add --no-cache git
+
+RUN addgroup --system --gid 1001 deployflow && \
     adduser --system --uid 1001 --ingroup deployflow appUser
 
-# Copy only necessary runtime files
-COPY --from=builder --chown=appUser:deployflow /home/app/node_modules ./node_modules
-COPY --from=builder --chown=appUser:deployflow /home/app/packages ./packages
-COPY --from=builder --chown=appUser:deployflow /home/app/apps/build-server ./apps/build-server
+# Copy dependencies and workspace packages
+COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
+COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
+COPY --from=deps --chown=appUser:deployflow /home/app/packages/awss3 ./packages/awss3
+COPY --from=deps --chown=appUser:deployflow /home/app/packages/prisma-store ./packages/prisma-store
+
+# Copy source code
+COPY --from=deps --chown=appUser:deployflow /home/app/apps/build-server ./apps/build-server
+
+USER appUser
+
+# Environment variables
+ENV NODE_ENV=production
 
 # Make main.sh executable
 RUN chmod +x ./apps/build-server/main.sh
 
-USER appUser
-
-CMD ["./apps/build-server/main.sh"]
+ENTRYPOINT ["./apps/build-server/main.sh"]
