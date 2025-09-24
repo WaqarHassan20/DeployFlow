@@ -29,8 +29,6 @@ jobs:
             dockerfile: docker/Dockerfile.reverse-proxy
             paths:
               - "apps/reverse-proxy/**"
-              - "packages/typescript-config/**"
-              - "packages/eslint-config/**"
 
           - name: build-server
             dockerfile: docker/Dockerfile.build-server

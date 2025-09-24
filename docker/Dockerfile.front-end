@@ -6,8 +6,6 @@ WORKDIR /home/app
 COPY package.json bun.lock turbo.json ./
 COPY apps/front-end/package.json ./apps/front-end/
 COPY packages/prisma-store/package.json ./packages/prisma-store/
-COPY packages/typescript-config/package.json ./packages/typescript-config/
-COPY packages/eslint-config/package.json ./packages/eslint-config/
 
 RUN bun install
 
@@ -44,12 +42,12 @@ ENV NEXTAUTH_URL="$BUILD_NEXTAUTH_URL"
 ENV NEXTAUTH_SECRET="$BUILD_NEXTAUTH_SECRET"
 ENV GOOGLE_CLIENT_ID="$BUILD_GOOGLE_CLIENT_ID"
 ENV GOOGLE_CLIENT_SECRET="$BUILD_GOOGLE_CLIENT_SECRET"
-ENV GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID"
 ENV GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_SECRET"
+ENV GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID"
 ENV RESEND_API_KEY="$BUILD_RESEND_API_KEY"
 ENV EMAIL_FROM="$BUILD_EMAIL_FROM"
-ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 
 # Debug: Check environment and files before build
 RUN echo "Current directory:" && pwd

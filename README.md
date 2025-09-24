@@ -133,3 +133,53 @@ Learn more about the power of Turborepo:
 - [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
 - [Configuration Options](https://turborepo.com/docs/reference/configuration)
 - [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+
+
+==================================================================================
+This is the GPT explanation about the .github/workflows/ci_main.yml file code of
+continuous integration on github of my project in monorepo with multiple services.
+================================================================================== 
+
+# 🚀 Deploy Whole Monorepo Workflow
+
+This repository uses **GitHub Actions** to automatically build and push Docker images for all services in the monorepo.  
+The workflow detects changes in specific directories and only rebuilds the services that were modified, ensuring efficient CI/CD.
+
+---
+
+## 📌 Workflow Overview
+
+- **Trigger**: Runs on every push to the `main` branch if files in `apps/**`, `packages/**`, or `docker/**` change.  
+- **Jobs**:
+  - Builds Docker images for **api-server**, **front-end**, **reverse-proxy**, and **build-server**.
+  - Pushes the images to **Docker Hub** with two tags:
+    - `latest`
+    - Git commit SHA (`${{ github.sha }}`)
+
+---
+
+## ⚙️ How It Works
+
+### 1. Checkout Code  
+Uses `actions/checkout` to fetch the full repository, ensuring proper build context.
+
+### 2. Docker Hub Login  
+Logs in using **secrets**:
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_PAT`
+
+### 3. Buildx Setup  
+Configures Docker Buildx for multi-platform builds.
+
+### 4. Detect Changed Services  
+Uses `dorny/paths-filter` to detect which services changed:
+- **api-server** → changes in `apps/api-server/**`, `packages/**`, or its Dockerfile.  
+- **front-end** → changes in `apps/front-end/**`, `packages/**`, or its Dockerfile.  
+- **reverse-proxy** → changes in `apps/reverse-proxy/**`, `packages/*-config/**`, or its Dockerfile.  
+- **build-server** → changes in `apps/build-server/**` or its Dockerfile.  
+
+### 5. Build & Push Images  
+If a service was changed, its Docker image is:
+- Built using its corresponding `Dockerfile`.
+- Passed the secret `DATABASE_URL` as a build argument.
+- Pushed to Docker Hub:
