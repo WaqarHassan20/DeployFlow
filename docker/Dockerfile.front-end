@@ -1,64 +1,72 @@
-# Stage 1: Install dependencies and build
+# Stage 1: Install ALL dependencies (needed for build)
 FROM oven/bun:1.2.15-alpine AS deps
-
-# Build argument for database URL (injected from CI/CD)
-ARG DATABASE_URL
-
 WORKDIR /home/app
-
-# Install required system deps
-RUN apk add --no-cache git libc6-compat
-
-# Copy workspace manifests
 COPY package.json bun.lock turbo.json ./
 COPY apps/front-end/package.json ./apps/front-end/
 COPY packages/prisma-store/package.json ./packages/prisma-store/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 
-# Copy all source
-COPY packages/prisma-store ./packages/prisma-store
-COPY packages/typescript-config ./packages/typescript-config
-COPY packages/eslint-config ./packages/eslint-config
-COPY apps/front-end ./apps/front-end
-
-# Install dependencies at root (monorepo-aware)
 RUN bun install
+
+# Stage 2: Build stage
+FROM oven/bun:1.2.15-alpine AS builder
+WORKDIR /home/app
+RUN apk add --no-cache git libc6-compat
+
+COPY --from=deps /home/app/node_modules ./node_modules
+COPY --from=deps /home/app/package.json ./package.json
+COPY --from=deps /home/app/turbo.json ./turbo.json
+COPY --from=deps /home/app/bun.lock ./bun.lock
+
+# Copy source code
+COPY packages ./packages
+COPY apps/front-end ./apps/front-end
 
 # Generate Prisma client
 RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 
-# Set build environment variables (required for Next.js build)
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-# Use build arg or fallback to placeholder
-ENV DATABASE_URL=${DATABASE_URL:-"postgresql://placeholder:placeholder@localhost:5432/placeholder"}
+# Build arguments for compilation (not secrets)
+ARG BUILD_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ARG BUILD_NEXTAUTH_URL="https://localhost:3000"
+ARG BUILD_NEXTAUTH_SECRET="dummy-auth-value-for-build"
+ARG BUILD_GOOGLE_CLIENT_ID="dummy-google-client-id"
+ARG BUILD_GOOGLE_CLIENT_SECRET="dummy-google-client-value"
+ARG BUILD_GITHUB_CLIENT_ID="dummy-github-client-id"
+ARG BUILD_GITHUB_CLIENT_SECRET="dummy-github-client-value"
+ARG BUILD_RESEND_API_KEY="dummy-resend-value"
+ARG BUILD_EMAIL_FROM="noreply@example.com"
 
-# Build Next.js frontend from root using bun workspace
-RUN bun --cwd apps/front-end run build
+# Build Next.js with build arguments
+RUN DATABASE_URL="$BUILD_DATABASE_URL" \
+    NEXTAUTH_URL="$BUILD_NEXTAUTH_URL" \
+    NEXTAUTH_SECRET="$BUILD_NEXTAUTH_SECRET" \
+    GOOGLE_CLIENT_ID="$BUILD_GOOGLE_CLIENT_ID" \
+    GOOGLE_CLIENT_SECRET="$BUILD_GOOGLE_CLIENT_SECRET" \
+    GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID" \
+    GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_SECRET" \
+    RESEND_API_KEY="$BUILD_RESEND_API_KEY" \
+    EMAIL_FROM="$BUILD_EMAIL_FROM" \
+    NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    bun --cwd apps/front-end run build
 
 
-# Stage 2: Runtime
+# Stage 3: Production Runtime (OPTIMIZED)
 FROM oven/bun:1.2.15-alpine AS runner
-
 WORKDIR /home/app
 
-# Create non-root user
-RUN addgroup --system --gid 1001 deployflow && \
+RUN apk add --no-cache git libc6-compat && \
+    addgroup --system --gid 1001 deployflow && \
     adduser --system --uid 1001 --ingroup deployflow appUser
 
-# Copy only necessary files
-COPY --from=deps --chown=appUser:deployflow /home/app/node_modules ./node_modules
-COPY --from=deps --chown=appUser:deployflow /home/app/bun.lock ./bun.lock
-COPY --from=deps --chown=appUser:deployflow /home/app/packages/prisma-store ./packages/prisma-store
-COPY --from=deps --chown=appUser:deployflow /home/app/packages/typescript-config ./packages/typescript-config
-COPY --from=deps --chown=appUser:deployflow /home/app/packages/eslint-config ./packages/eslint-config
+# Copy only Next.js build output and essential files (using standalone build)
+COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/.next/standalone ./
+COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/.next/static ./apps/front-end/.next/static
 
-# Copy built frontend
-COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/.next ./apps/front-end/.next
-COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/public ./apps/front-end/public
-COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/package.json ./apps/front-end/package.json
-COPY --from=deps --chown=appUser:deployflow /home/app/apps/front-end/next.config.ts ./apps/front-end/next.config.ts
+# Create public directory (standalone build expects it even if empty)
+RUN mkdir -p ./apps/front-end/public
+COPY --from=builder --chown=appUser:deployflow /home/app/apps/front-end/public ./apps/front-end/public
 
 USER appUser
 
@@ -70,5 +78,5 @@ ENV HOSTNAME="0.0.0.0"
 
 EXPOSE 3000
 
-# Run Next.js
-ENTRYPOINT ["bun", "--cwd", "apps/front-end", "run", "start"]
+# Run Next.js standalone server
+CMD ["node", "apps/front-end/server.js"]

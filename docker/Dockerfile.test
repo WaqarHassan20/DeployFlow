@@ -1,0 +1,73 @@
+FROM oven/bun:alpine AS baseimage
+
+# Stage 1: Install ALL dependencies (needed for build)
+
+FROM baseimage AS deps
+WORKDIR /home/app
+COPY package.json bun.lock turbo.json ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/api-server/package.json ./apps/api-server/
+COPY apps/reverse-proxy/package.json ./apps/reverse-proxy/
+COPY packages/prismaDB/package.json ./packages/prismaDB/
+
+RUN bun install
+
+# Stage 2: Build stage
+FROM baseimage AS builder
+WORKDIR /home/app
+RUN apk add --no-cache openssl
+
+COPY --from=deps /home/app/node_modules ./node_modules
+COPY --from=deps /home/app/package.json ./package.json
+COPY --from=deps /home/app/turbo.json ./turbo.json
+COPY --from=deps /home/app/bun.lock ./bun.lock
+
+# Copy source code
+COPY packages ./packages
+COPY apps/web ./apps/web
+
+RUN bun run db:generate
+
+
+# Build arguments for compilation (not secrets)
+ARG BUILD_DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ARG BUILD_NEXTAUTH_URL="https://localhost:3000"
+ARG BUILD_NEXTAUTH_VALUE="dummy-auth-value-for-build"
+ARG BUILD_GOOGLE_CLIENT_ID="dummy-google-client-id"
+ARG BUILD_GOOGLE_CLIENT_VALUE="dummy-google-client-value"
+ARG BUILD_GITHUB_CLIENT_ID="dummy-github-client-id"
+ARG BUILD_GITHUB_CLIENT_VALUE="dummy-github-client-value"
+ARG BUILD_RESEND_VALUE="dummy-resend-value"
+ARG BUILD_EMAIL_FROM="noreply@example.com"
+
+# Build Next.js with build arguments
+RUN DATABASE_URL="$BUILD_DATABASE_URL" \
+    NEXTAUTH_URL="$BUILD_NEXTAUTH_URL" \
+    NEXTAUTH_SECRET="$BUILD_NEXTAUTH_VALUE" \
+    GOOGLE_CLIENT_ID="$BUILD_GOOGLE_CLIENT_ID" \
+    GOOGLE_CLIENT_SECRET="$BUILD_GOOGLE_CLIENT_VALUE" \
+    GITHUB_CLIENT_ID="$BUILD_GITHUB_CLIENT_ID" \
+    GITHUB_CLIENT_SECRET="$BUILD_GITHUB_CLIENT_VALUE" \
+    RESEND_API_KEY="$BUILD_RESEND_VALUE" \
+    EMAIL_FROM="$BUILD_EMAIL_FROM" \
+    bun run build:web
+
+# Stage 3: Production Runtime (OPTIMIZED)
+FROM oven/bun:alpine AS runner
+WORKDIR /home/app
+
+RUN apk add --no-cache openssl && \
+    addgroup --system --gid 1001 novahost && \
+    adduser --system --uid 1001 --ingroup novahost appUser
+
+# Copy only Next.js build output and essential files
+COPY --from=builder --chown=appUser:novahost /home/app/apps/web/.next/standalone ./
+COPY --from=builder --chown=appUser:novahost /home/app/apps/web/.next/static ./apps/web/.next/static
+
+# Create public directory (standalone build expects it even if empty)
+RUN mkdir -p ./apps/web/public
+
+USER appUser
+EXPOSE 3000
+
+CMD ["node", "apps/web/server.js"]
