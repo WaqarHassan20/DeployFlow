@@ -81,6 +81,8 @@ jobs:
           context: .
           file: ${{ matrix.service.dockerfile }}
           push: true
+          build-args: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
           tags: |
             waqarhasan/deployflow-${{ matrix.service.name }}:latest
             waqarhasan/deployflow-${{ matrix.service.name }}:${{ github.sha }}

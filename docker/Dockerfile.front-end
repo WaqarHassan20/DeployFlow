@@ -1,6 +1,9 @@
 # Stage 1: Install dependencies and build
 FROM oven/bun:1.2.15-alpine AS deps
 
+# Build argument for database URL (injected from CI/CD)
+ARG DATABASE_URL
+
 WORKDIR /home/app
 
 # Install required system deps
@@ -28,14 +31,11 @@ RUN bunx prisma generate --schema=./packages/prisma-store/prisma/schema.prisma
 # Set build environment variables (required for Next.js build)
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+# Use build arg or fallback to placeholder
+ENV DATABASE_URL=${DATABASE_URL:-"postgresql://placeholder:placeholder@localhost:5432/placeholder"}
 
-# Build Next.js frontend with explicit working directory
-WORKDIR /home/app/apps/front-end
-RUN bun run build
-
-# Return to main workdir
-WORKDIR /home/app
+# Build Next.js frontend from root using bun workspace
+RUN bun --cwd apps/front-end run build
 
 
 # Stage 2: Runtime
